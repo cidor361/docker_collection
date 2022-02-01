@@ -1,0 +1,59 @@
+version: '3'
+services:
+  mariadb:
+    image: docker.io/bitnami/mariadb:10.3
+    environment:
+      # ALLOW_EMPTY_PASSWORD is recommended only for development.
+      - ALLOW_EMPTY_PASSWORD=yes
+      - MARIADB_USER=bn_moodle
+      - MARIADB_DATABASE=bitnami_moodle
+      - MARIADB_CHARACTER_SET=utf8mb4
+      - MARIADB_COLLATE=utf8mb4_unicode_ci
+    networks:
+      back:
+        ipv4_address: 172.16.239.2
+      default:
+  moodle:
+    image: docker.io/bitnami/moodle:3
+    ports:
+      - '8005:8080'
+      - '8087:8443'
+    environment:
+      - MOODLE_DATABASE_HOST=mariadb
+      - MOODLE_DATABASE_PORT_NUMBER=3306
+      - MOODLE_DATABASE_USER=bn_moodle
+      - MOODLE_DATABASE_NAME=bitnami_moodle
+      # ALLOW_EMPTY_PASSWORD is recommended only for development.
+      - ALLOW_EMPTY_PASSWORD=yes
+    depends_on:
+      - mariadb
+    networks:
+      back:
+        ipv4_address: 172.16.239.3
+      default:
+      
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    ports:
+      - "8086:80"
+    depends_on:
+      - mariadb
+    environment:
+      PMA_HOST: mariadb
+    networks:
+      back:
+        ipv4_address: 172.16.239.4
+      default:
+
+networks:
+#Internal-only network for proper nginx proxying and ssh
+  back:
+    driver: bridge
+    internal: true
+    ipam:
+     driver: default
+     config:
+       - subnet: 172.16.239.0/24
+#External network actually
+  default:
+    driver: bridge

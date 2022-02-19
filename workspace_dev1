@@ -1,0 +1,121 @@
+version: "3"
+
+services:
+  webserver_dev1:
+    build:
+      context: ./bin/${PHPVERSION}
+    container_name: '${COMPOSE_PROJECT_NAME}-${PHPVERSION}'
+    restart: 'always'
+    ports:
+      - "${HOST_MACHINE_UNSECURE_HOST_PORT}:80"
+      - "${HOST_MACHINE_SECURE_HOST_PORT}:443"
+    links:
+      - database_dev1
+    volumes:
+      - ${DOCUMENT_ROOT-./www}:/var/www/html
+      - ${PHP_INI-./config/php/php.ini}:/usr/local/etc/php/php.ini
+      - ${VHOSTS_DIR-./config/vhosts}:/etc/apache2/sites-enabled
+      - ${LOG_DIR-./logs/apache2}:/var/log/apache2
+    environment:
+      APACHE_DOCUMENT_ROOT: ${APACHE_DOCUMENT_ROOT-/var/www/html}
+      PMA_PORT: ${HOST_MACHINE_PMA_PORT}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    networks:
+      back:
+        ipv4_address: 172.16.245.2
+      default:
+
+
+  database_dev1:
+    build:
+      context: "./bin/${DATABASE}"
+    container_name: '${COMPOSE_PROJECT_NAME}-${DATABASE}'
+    restart: 'always'
+    ports:
+      - "${HOST_MACHINE_MYSQL_PORT}:3306"
+    volumes:
+      - ${MYSQL_DATA_DIR-./data/mysql}:/var/lib/mysql
+      - ${MYSQL_LOG_DIR-./logs/mysql}:/var/log/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    networks:
+      back:
+        ipv4_address: 172.16.245.3
+      default:
+	  
+  phpmyadmin_dev1:
+    image: phpmyadmin/phpmyadmin
+    container_name: '${COMPOSE_PROJECT_NAME}-phpmyadmin'
+    restart: 'always'
+    links:
+      - database_dev1
+    environment:
+      PMA_HOST: database_dev1
+      PMA_PORT: 3306
+      PMA_USER: root
+      PMA_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      UPLOAD_LIMIT: ${UPLOAD_LIMIT}
+      MEMORY_LIMIT: ${MEMORY_LIMIT}
+    ports:
+      - '${HOST_MACHINE_PMA_PORT}:80'
+    volumes:
+      - /sessions
+      - ${PHP_INI-./config/php/php.ini}:/usr/local/etc/php/conf.d/php-phpmyadmin.ini
+    networks:
+      back:
+        ipv4_address: 172.16.245.4
+      default:
+
+
+  redis_dev1:
+    container_name: '${COMPOSE_PROJECT_NAME}-redis'
+    restart: 'always'
+    image: redis:latest
+    ports:
+      - "127.0.0.1:${HOST_MACHINE_REDIS_PORT}:6379"
+    networks:
+      back:
+        ipv4_address: 172.16.245.4
+      default:
+
+
+
+  code-server_dev1:
+    image: lscr.io/linuxserver/code-server
+    container_name: code-server
+    restart: 'always'
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/London
+      - PASSWORD=123
+      - SUDO_PASSWORD=321
+      - PROXY_DOMAIN=code-server.my.domain
+      - DEFAULT_WORKSPACE=/config/workspace
+    volumes:
+      - /home/i/dockerData/WORKSPACE_1/config_cs:/config
+      - /home/i/dockerData/WORKSPACE_1/docker-compose-lamp/www:/config/workspace
+    ports:
+      - 8443:8443
+    restart: 'always'
+    networks:
+      back:
+        ipv4_address: 172.16.245.5
+      default:
+
+networks:
+  back:
+    driver: bridge
+    internal: true
+    ipam:
+     driver: default
+     config:
+       - subnet: 172.16.245.0/24
+  default:
+    driver: bridge
